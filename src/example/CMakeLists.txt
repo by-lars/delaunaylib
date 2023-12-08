@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.11)
 project("DelaunayVis")
 
+set (CMAKE_CXX_STANDARD 20)
+
 # Dependencies
 set(RAYLIB_VERSION 4.5.0)
 find_package(raylib ${RAYLIB_VERSION} QUIET) # QUIET or REQUIRED
