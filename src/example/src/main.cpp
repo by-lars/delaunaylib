@@ -7,6 +7,8 @@
 
 #include <delaunay.hpp>
 
+delaunay::points_t points;
+
 
 void draw_delaunay(delaunay::points_ref_t points) {
     for(const auto& point : points) {
@@ -26,6 +28,10 @@ void draw_delaunay(delaunay::points_ref_t points) {
             DrawLine(edge->start.x, edge->start.y, edge->end.x, edge->end.y, GREEN);
     }
 
+    for(const auto& edge : edges) {
+        if(edge->data == -1)
+            DrawLine(edge->start.x, edge->start.y, edge->end.x, edge->end.y, WHITE);
+    }
 }
 
 void draw_grid() {
@@ -67,30 +73,31 @@ void update_camera(Camera2D& camera) {
 }
 
 int main() {
-    delaunay::points_t points;
+
     std::random_device dev;
     std::mt19937 rng(dev());
     std::uniform_real_distribution<float> dist(0, 200);
-    std::uniform_real_distribution<float> velocity(-1.0f, 1.0f);
 
-    for(int i = 0; i < 100; i++) {
-        points.emplace_back(
-            dist(rng), dist(rng)
-        );
-    }
+    //for(int i = 0; i < 100; i++) {
+    //    points.emplace_back(
+    //        dist(rng), dist(rng)
+    //    );
+    //}
+
+
 
     Camera2D camera = { 0 };
     camera.zoom = 1.0f;
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(800, 800, "Delaunay Visualisation");
+    InitWindow(1000, 800, "Delaunay Visualisation");
 
     while (!WindowShouldClose()) {
         update_camera(camera);
 
-        for(int i = 0; i < 100; i++) {
-            //points[i].x += velocity(rng) * 0.1f;
-            //points[i].y += velocity(rng) * 0.1f;
+        if(IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+            auto pos = GetMousePosition();
+            points.emplace_back(pos.x, pos.y);
         }
 
         BeginDrawing();

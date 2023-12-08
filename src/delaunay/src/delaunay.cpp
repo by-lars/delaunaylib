@@ -62,9 +62,14 @@ namespace delaunay {
     void Edge::delete_edge(Edge* e) {
         Edge::splice(e, e->orbit_prev);
         Edge::splice(e->sym(), e->sym()->orbit_prev);
+        e->data = -1;
     }
 
     std::vector<Edge*> triangulate(points_t points) {
+        if(points.size() < 3) {
+            return {};
+        }
+
         Edge::edges.clear();
 
 
@@ -100,9 +105,21 @@ namespace delaunay {
         //
         // |A| > 0 if d is in the circle defined by (a, b, c)
 
-        float a1 = a.x - d.x;
-        float a2 = a.y - d.y;
+        float a1 = a.x-d.x;
+        float a2 = a.y-d.y;
 
-        return false;
+        float b1 = b.x-d.x;
+        float b2 = b.y-d.y;
+
+        float c1 = c.x-d.x;
+        float c2 = c.y-d.y;
+
+        float a3 = a1*a1 + a2*a2;;
+        float b3 = b1*b1 + b2*b2;
+        float c3 = c1*c1 + c2*c2;
+
+        float det = a1*b2*c3 + a2*b3*c1 + a3*b1*c2 - (a3*b2*c1 + a1*b3*c2 + a2*b1*c3);
+
+        return det < 0;
     }
 }

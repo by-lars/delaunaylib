@@ -43,9 +43,9 @@ namespace delaunay {
         // Compute the lower common tangent of left and right
         while (true) {
             if(ldi->is_point_on_left(rdi->start)) {
-                ldi = ldi->sym()->orbit_next;
+                ldi = ldi->sym()->orbit_next; // CHECK THIS
             } else if (rdi->is_point_on_right(ldi->start)) {
-                rdi = rdi->sym()->orbit_prev;
+                rdi = rdi->sym()->orbit_prev; // CHECK THIS
             } else {
                 break;
             }
@@ -58,16 +58,41 @@ namespace delaunay {
         if(ldi->start == ldo->start) { ldo = base->sym(); }
         if(rdi->start == rdo->start) { rdo = base; }
 
-        // Merge
-        Edge* lcand = base->sym()->orbit_prev;
+        while (true) {
+            // Merge
+            Edge* lcand = base->sym()->orbit_next;
+            bool lcand_valid = base->is_point_on_right(lcand->end); // valid(e) = RightOf(e.dest, basel)
 
-        // valid(e) = RightOf(e.dest, basel)
-        if(base->is_point_on_right(lcand->end)) {
-            while(in_circle(base->end, base->start, lcand->end, lcand->orbit_next->end)) {
-                Edge* temp = lcand->orbit_next;
-                Edge::delete_edge(lcand);
-                lcand = temp;
+            if(lcand_valid) {
+                while(in_circle(base->end, base->start, lcand->end, lcand->orbit_next->end)) {
+                    Edge* temp = lcand->orbit_next;
+                    Edge::delete_edge(lcand);
+                    lcand = temp;
+                }
             }
+
+            Edge* rcand = base->orbit_prev;
+            bool rcand_valid = base->is_point_on_right(rcand->end); // valid(e) = RightOf(e.dest, basel)
+
+            if(rcand_valid) {
+                while (in_circle(base->end, base->start, rcand->end, rcand->orbit_prev->end)) {
+                    Edge* tmp = rcand->orbit_prev;
+                    Edge::delete_edge(rcand);
+                    rcand = tmp;
+                }
+            }
+
+            // Base must be the upper common tangent
+            if(!lcand_valid && !rcand_valid) {
+                break;
+            }
+
+            if(!lcand_valid || (rcand_valid && in_circle(lcand->end, lcand->start, rcand->start, rcand->end))) {
+                base = Edge::connect(rcand, base->sym());
+            } else {
+                base = Edge::connect(base->sym(), lcand->sym());
+            }
+
         }
 
         return {ldo, rdo};
