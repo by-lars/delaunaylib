@@ -71,11 +71,19 @@ namespace delaunay {
         }
 
         Edge::edges.clear();
+        Triangulator::counter = 0;
+
+
+        //std::stable_sort(points.begin(), points.end(), [](point_ref_t a, point_ref_t b) {
+        //    return a.y > b.y;
+        //});
 
 
         std::stable_sort(points.begin(), points.end(), [](point_ref_t a, point_ref_t b) {
             return a.x > b.x;
         });
+
+
 
         Triangulator tri;
         tri.triangulate(points, 0, points.size());

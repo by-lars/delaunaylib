@@ -2,10 +2,17 @@
 #include <iostream>
 
 namespace delaunay {
+    int Triangulator::counter = 1;
+
     std::pair<Edge*, Edge*> Triangulator::triangulate(delaunay::points_ref_t points, std::size_t start, std::size_t length) {
+
+
         // Gen a new edge, if only two points are remaning
         if(length==2) {
             Edge* a = Edge::make(points[start], points[start+1]);
+            counter++;
+            a->data = counter;
+            a->sym()->data = counter;
             return {a, a->sym()};
         }
 
@@ -19,11 +26,21 @@ namespace delaunay {
             Edge* b = Edge::make(p2, p3);
             Edge::splice(a->sym(), b);
 
+            counter++;
+            a->data = counter;
+            a->sym()->data = counter;
+            b->data = counter;
+            b->sym()->data = counter;
+
             if(counter_clock_wise(p1, p2, p3)) {
                 auto c = Edge::connect(b, a);
+                c->data = counter;
+                c->sym()->data = counter;
                 return {a, b->sym()};
             } else if(counter_clock_wise(p1, p3, p2)) {
                 auto c = Edge::connect(b, a);
+                c->data = counter;
+                c->sym()->data = counter;
                 return {c->sym(), c};
             } else { // The three points are collinear
                 return {a,b->sym()};
@@ -58,7 +75,7 @@ namespace delaunay {
         if(ldi->start == ldo->start) { ldo = base->sym(); }
         if(rdi->start == rdo->start) { rdo = base; }
 
-        while (true) {
+        while (false) {
             // Merge
             Edge* lcand = base->sym()->orbit_next;
             bool lcand_valid = base->is_point_on_right(lcand->end); // valid(e) = RightOf(e.dest, basel)

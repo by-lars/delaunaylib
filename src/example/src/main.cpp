@@ -20,7 +20,13 @@ void draw_delaunay(delaunay::points_ref_t points) {
     auto edges = delaunay::triangulate(points);
 
     for(const auto& edge : edges) {
-        DrawLine(edge->start.x, edge->start.y, edge->end.x, edge->end.y, BLACK);
+        srand(edge->data);
+        uint8_t r = rand()%255;
+        uint8_t g = rand()%255;
+        uint8_t b = rand()%255;
+        Color c {r,g,b, 255};
+       // DrawLine(edge->start.x, edge->start.y, edge->end.x, edge->end.y, c);
+        DrawLineEx({edge->start.x, edge->start.y}, {edge->end.x, edge->end.y}, 0.5f, c);
     }
 
     for(const auto& edge : edges) {
@@ -76,11 +82,13 @@ int main() {
 
     std::random_device dev;
     std::mt19937 rng(dev());
-    std::uniform_real_distribution<float> dist(0, 200);
+    std::uniform_real_distribution<float> distx(0, 200);
+    std::uniform_real_distribution<float> disty(0, 100);
 
-    //for(int i = 0; i < 100; i++) {
+
+    //for(int i = 0; i < 10; i++) {
     //    points.emplace_back(
-    //        dist(rng), dist(rng)
+    //        distx(rng), disty(rng)
     //    );
     //}
 

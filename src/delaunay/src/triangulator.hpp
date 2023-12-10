@@ -9,7 +9,7 @@ namespace delaunay {
     class Triangulator {
     public:
         std::pair<Edge*, Edge*> triangulate(points_ref_t points, std::size_t start, std::size_t length);
-
+        static int counter;
 
     private:
     };
