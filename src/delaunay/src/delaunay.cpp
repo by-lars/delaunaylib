@@ -135,6 +135,7 @@ namespace delaunay {
         for(const auto& edge : QuadEdge::s_edges) {
             if(edge->data == 1 || edge->data == 2 || edge->data == 3 || edge->data == 4) {
                 edges.emplace_back(edge->origin(), edge->destination(), edge->data);
+                edge->sym()->data = 0;
             }
         }
 

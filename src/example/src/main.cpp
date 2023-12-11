@@ -66,6 +66,7 @@ void update_camera(Camera2D& camera) {
         // Zoom increment
         const float zoomIncrement = 0.125f;
 
+
         camera.zoom += (wheel*zoomIncrement);
         if (camera.zoom < zoomIncrement) camera.zoom = zoomIncrement;
     }
@@ -74,14 +75,11 @@ void update_camera(Camera2D& camera) {
 int main() {
 
     srand(420);
-
     for(int i = 0; i < 100; i++) {
         points.emplace_back(
-            rand() % 200, rand() % 200
+            rand() % 500, rand() % 500
         );
     }
-
-
 
     Camera2D camera = { 0 };
     camera.zoom = 1.0f;
@@ -93,8 +91,12 @@ int main() {
         update_camera(camera);
 
         if(IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-            auto pos = GetMousePosition();
+            Vector2 pos = GetScreenToWorld2D(GetMousePosition(), camera);
             points.emplace_back(pos.x, pos.y);
+        }
+
+        if(IsKeyPressed(KEY_D)) {
+            points.clear();
         }
 
         BeginDrawing();
