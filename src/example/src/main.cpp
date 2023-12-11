@@ -20,23 +20,16 @@ void draw_delaunay(delaunay::points_ref_t points) {
     auto edges = delaunay::triangulate(points);
 
     for(const auto& edge : edges) {
-        srand(edge->data);
-        uint8_t r = rand()%255;
-        uint8_t g = rand()%255;
-        uint8_t b = rand()%255;
-        Color c {r,g,b, 255};
-       // DrawLine(edge->start.x, edge->start.y, edge->end.x, edge->end.y, c);
-        DrawLineEx({edge->start.x, edge->start.y}, {edge->end.x, edge->end.y}, 0.5f, c);
-    }
+        if(edge.data == 1) {
+           DrawLine(edge.origin.x, edge.origin.y, edge.destination.x, edge.destination.y, GREEN);
+        } else if(edge.data == 2) {
+           DrawLine(edge.origin.x, edge.origin.y, edge.destination.x, edge.destination.y, BLUE);
+        } else if (edge.data == 3){
+           DrawLine(edge.origin.x, edge.origin.y, edge.destination.x, edge.destination.y, RED);
+        } else {
+            DrawLine(edge.origin.x, edge.origin.y, edge.destination.x, edge.destination.y, ORANGE);
+        }
 
-    for(const auto& edge : edges) {
-        if(edge->data == 1)
-            DrawLine(edge->start.x, edge->start.y, edge->end.x, edge->end.y, GREEN);
-    }
-
-    for(const auto& edge : edges) {
-        if(edge->data == -1)
-            DrawLine(edge->start.x, edge->start.y, edge->end.x, edge->end.y, WHITE);
     }
 }
 
@@ -80,17 +73,13 @@ void update_camera(Camera2D& camera) {
 
 int main() {
 
-    std::random_device dev;
-    std::mt19937 rng(dev());
-    std::uniform_real_distribution<float> distx(0, 200);
-    std::uniform_real_distribution<float> disty(0, 100);
+    srand(420);
 
-
-    //for(int i = 0; i < 10; i++) {
-    //    points.emplace_back(
-    //        distx(rng), disty(rng)
-    //    );
-    //}
+    for(int i = 0; i < 100; i++) {
+        points.emplace_back(
+            rand() % 200, rand() % 200
+        );
+    }
 
 
 
