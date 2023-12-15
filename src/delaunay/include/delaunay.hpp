@@ -6,9 +6,19 @@
 
 #include "edge.hpp"
 #include "point.hpp"
+#include "quad_edge.hpp"
 
 namespace delaunay {
     std::vector<Edge> triangulate(points_t points);
+
+    struct Triangle {
+        HalfEdge* a;
+        HalfEdge* b;
+        HalfEdge* c;
+    };
+
+    HalfEdge* triangulate_points(points_t points);
+    std::vector<Triangle> get_triangles(points_t points);
 }
 
 

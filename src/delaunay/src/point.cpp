@@ -1,4 +1,5 @@
 #include "point.hpp"
+#include <iostream>
 
 namespace delaunay {
     Point::Point(float x, float y) : x(x), y(y) {}
@@ -8,16 +9,16 @@ namespace delaunay {
     }
 
     bool Point::counter_clock_wise(const Point &a, const Point &b, const Point &c) {
-        //       | a.x a.y 1 |
-        // |A| = | b.x b.y 1 | > 0
+        //       | a.x a.y 1 |    | a.x - c.x  a.y - c.y |
+        // |A| = | b.x b.y 1 |  = | b.x - c.x  b.y - c.y |
         //       | c.x c.y 1 |
         //
         // The points are in counterclockwise order
         // if the determinant of the matrix is grater than 0
         //
-        // |A| = a.x * (b.y * 1 - 1 * c.y) - a.y * (b.x * 1 - 1 * c.x) + 1 * (b.x * c.y - b.y * c.x)
+        // This 3x3 Matrix is simplified to a 2x2 Matrix using: https://www.cs.cmu.edu/~quake/robust.html
 
-        float det = a.x * (b.y - c.y) - a.y * (b.x - c.x) + (b.x * c.y - b.y * c.x);
+        float det = (a.x - c.x) * (b.y - c.y) - (a.y - c.y) * (b.x - c.x);
         return det > 0;
     }
 
@@ -28,7 +29,7 @@ namespace delaunay {
         //       | d.x d.y d.x² + d.y² 1 |
         //
         // |A| > 0 if d is in the circle defined by (a, b, c)
-        // The expensive determinant of this 4x4 Matrix can be
+        // The expensive determinant of this 4x4 Matrix is
         // simplified to a 3x3 determinant using using: https://www.cs.cmu.edu/~quake/robust.html
 
         float a1 = a.x-d.x;
