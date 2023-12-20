@@ -4,7 +4,7 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <rlgl.h>
-
+#include <algorithm>
 #include <delaunay.hpp>
 
 void draw_delaunay(const std::vector<delaunay::Edge>& edges) {
@@ -31,11 +31,19 @@ Vector2 to_vec2(delaunay::point_ref_t p) {
     return {p.x,p.y};
 }
 
-void draw_triangles(const std::vector<delaunay::Triangle>& triangles) {
+void draw_triangles(std::vector<delaunay::Triangle>& triangles) {
     srand(0);
-    for(const auto& t : triangles) {
+    for(auto& t : triangles) {
         Color c {uint8_t(rand() % 255), uint8_t(rand() % 255), uint8_t(rand() % 255), 255};
+        rlPushMatrix();
+        rlTranslatef(rand() % 20, rand() % 20, 0);
         DrawTriangle(to_vec2(t.a->origin()), to_vec2(t.b->origin()), to_vec2(t.c->origin()), c);
+        rlPopMatrix();
+    }
+
+    for(const auto& t : triangles) {
+        auto center = t.circumcenter();
+        DrawCircle(center.x, center.y, 2.0f, PINK);
     }
 }
 
@@ -178,22 +186,13 @@ int main() {
         auto edges = delaunay::triangulate(points);
         auto tris = delaunay::get_triangles(points);
 
-        //auto middle_points = gen_middle_points(edges);
-        //auto target_points = find_trajectory(car_position, middle_points);
-
         BeginDrawing();
             ClearBackground(RAYWHITE);
             BeginMode2D(camera);
                 draw_grid();
-                //rlLoadIdentity();
                 draw_triangles(tris);
-
                 draw_delaunay(edges);
-
-                //draw_points(points, BLACK, 2);
-                //draw_points(middle_points, BLUE, 1);
                 draw_car(car_position, car_theta);
-               // draw_points(target_points, ORANGE, 4);
             EndMode2D();
         EndDrawing();
     }

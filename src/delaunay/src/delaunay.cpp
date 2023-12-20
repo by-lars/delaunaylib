@@ -116,6 +116,10 @@ namespace delaunay {
     }
 
     std::vector<Edge> triangulate(points_t points) {
+        if(points.size() < 3) {
+            return {};
+        }
+
         triangulate_points(points);
 
         std::vector<Edge> edges;
@@ -131,15 +135,15 @@ namespace delaunay {
     }
 
     HalfEdge* triangulate_points(points_t points) {
+        if(points.size() < 3) {
+            return {};
+        }
+
         for(HalfEdge* e : HalfEdge::s_edges)  {
             delete e;
         }
 
         HalfEdge::s_edges.clear();
-
-        if(points.size() < 3) {
-            return {};
-        }
 
         std::stable_sort(points.begin(), points.end(), [](point_ref_t a, point_ref_t b) {
             return a == b ? a.y > b.y : a.x > b.x;
@@ -150,6 +154,10 @@ namespace delaunay {
     }
 
     std::vector<Triangle> get_triangles(points_t points) {
+        if(points.size() < 3) {
+            return {};
+        }
+
         HalfEdge* starting_edge = triangulate_points(points);
 
         //visited = set()
@@ -175,31 +183,40 @@ namespace delaunay {
         }
 
         std::stack<HalfEdge*> to_visit;
-        to_visit.emplace(starting_edge);
-
+        auto current = starting_edge;
+        do {
+            to_visit.push(current->sym());
+            current = current->left_face_next();
+        } while(current != starting_edge);
 
 
         while(!to_visit.empty()) {
             HalfEdge* e = to_visit.top();
             to_visit.pop();
 
-            if(e->data == 0 || e->data == -1) {
+            if(e->data == -1 || e->data == 0) {
                 continue;
             }
 
-            e->data = 0;
+            auto current = e;
+            std::vector<HalfEdge*> tris_points;
 
-            if(e->is_point_on_left(e->left_face_next()->destination())) {
-                Triangle t {e, e->left_face_next()->sym(), e->sym()};
-                triangles.push_back(t);
-            } else {
-                Triangle t {e, e->sym(), e->left_face_next()->sym()};
-                triangles.push_back(t);
-            }
+            do {
+                tris_points.push_back(current);
+                if(tris_points.size() == 3) {
+                    triangles.push_back({
+                    tris_points[0], tris_points[1], tris_points[2]
+                    });
+                    tris_points.clear();
+                }
 
+                if(current->sym()->data > 0) {
+                    to_visit.push(current->sym());
+                }
 
-            to_visit.push(e->sym());
-            to_visit.push(e->left_face_next());
+                current->data = 0;
+                current = current->left_face_next();
+            } while(current != e);
 
         }
 
