@@ -1,225 +1,311 @@
-#include "delaunay.hpp"
-#include "quad_edge.hpp"
+#include "delaunay/delaunay.hpp"
+#include "delaunay/quad_edge.hpp"
 
 #include <algorithm>
-#include <iostream>
+#include <cmath>
 #include <stack>
 
 namespace delaunay {
+    auto Delaunay::triangulate(std::vector<point_t> &points) -> delaunay::Delaunay {
+        return Delaunay(points);
+    }
 
-    static std::pair<HalfEdge*, HalfEdge*> delaunay_divide_and_conquer(points_ref_t points, std::size_t start, std::size_t length) {
-        if(length==2) {
-            auto a = HalfEdge::make(points[start], points[start + 1]);
-            a->data = 2;
-            a->sym()->data = 2;
-            return {a, a->sym()};
+    Delaunay::Delaunay(std::vector<point_t> &points) {
+        // Triangulation requires at least 3 Points
+        if (points.size() < 3) {
+            return;
         }
 
-        // Gen a triangle, if 3 points are remaining
-        if(length==3) {
-            const auto& p1 = points[start];
-            const auto& p2 = points[start+1];
-            const auto& p3 = points[start+2];
+        // Sort points, as this is important for the divide and concquer algorithm to work
+        std::stable_sort(points.begin(), points.end(), [](point_t const &a, point_t const &b) {
+            return a.y > b.y;
+        });
 
-            auto a = HalfEdge::make(p1, p2);
-            HalfEdge* b = HalfEdge::make(p2, p3);
-            HalfEdge::splice(a->sym(), b);
+        std::stable_sort(points.begin(), points.end(), [](point_t const &a, point_t const &b) {
+            return a.x > b.x;
+        });
 
-            a->data = 3;
-            a->sym()->data = 3;
-            b->data = 3;
-            b->sym()->data = 3;
+        // Remove duplicates, as they destroy the triangulation
+        auto last = std::unique(points.begin(), points.end());
+        points.erase(last, points.end());
 
-            if(Point::counter_clock_wise(p1, p2, p3)) {
-                auto c = HalfEdge::connect(b, a);
-                c->data = 3;
-                c->sym()->data = 3;
-                return {a, b->sym()};
-            } else if(Point::counter_clock_wise(p1, p3, p2)) {
-                auto c = HalfEdge::connect(b, a);
-                c->data = 3;
-                c->sym()->data = 3;
-                return {c->sym(), c};
-            } else { // The three points are collinear
-                return {a,b->sym()};
-            }
+        // Call recursive triangulation routine
+        auto result = delaunay_divide_and_conquer(points, 0, points.size());
+
+        // Create Vornoi Graph (starting at the right most edge
+        calculate_vornoi_graph(result.first);
+    }
+
+
+    auto Delaunay::build_triangle(std::size_t start, std::vector<point_t> const &points)
+        -> std::pair<QuadEdge *, QuadEdge *> {
+        auto const &p1 = points[start];
+        auto const &p2 = points[start + 1];
+        auto const &p3 = points[start + 2];
+
+        auto *a = make_edge(p1, p2);
+        auto *b = make_edge(p2, p3);
+        splice_edges(a->sym(), b);
+
+        if (point_t::counter_clock_wise(p1, p2, p3)) {
+            std::ignore = connect_edges(b, a);
+            return {a, b->sym()};
         }
 
-        // Divide and CONQUER
-        int off = length % 2 == 0 ? 0 : 1; // Adjust for uneven lengths of array
-        auto left = delaunay_divide_and_conquer(points, start, length / 2);
-        auto right = delaunay_divide_and_conquer(points, start + length / 2, length / 2 + off);
-
-
-        HalfEdge* ldo = left.first;
-        HalfEdge* ldi = left.second;
-        HalfEdge* rdi = right.first;
-        HalfEdge* rdo = right.second;
-
-        // Compute the lower common tangent of left and right
-        while (true) {
-            if(ldi->is_point_on_left(rdi->origin())) {
-                ldi = ldi->left_face_next();
-            } else if (rdi->is_point_on_right(ldi->origin())) {
-                rdi = rdi->right_face_prev(); // eRprev
-            } else {
-                break;
-            }
+        if (point_t::counter_clock_wise(p1, p3, p2)) {
+            auto *c = connect_edges(b, a);
+            return {c->sym(), c};
         }
 
+        // The three points are collinear
+        return {a, b->sym()};
+    }
+
+    auto
+    Delaunay::merge(QuadEdge *ldo, QuadEdge *ldi, QuadEdge *rdi, QuadEdge *rdo) -> std::pair<QuadEdge *, QuadEdge *> {
         // Create the first base QuadEdge, from rdi.start to ldi.start
-        HalfEdge* base = HalfEdge::connect(rdi->sym(), ldi);
-        base->data = 1;
-        base->sym()->data = 1;
+        QuadEdge *base = connect_edges(rdi->sym(), ldi);
 
-        if(ldi->origin() == ldo->origin()) { ldo = base->sym(); }
-        if(rdi->origin() == rdo->origin()) { rdo = base; }
+        if (ldi->origin() == ldo->origin()) {
+            ldo = base->sym();
+        }
+        if (rdi->origin() == rdo->origin()) {
+            rdo = base;
+        }
 
         while (true) {
             // Merge
-            HalfEdge* lcand = base->sym()->orbit_next();
-            bool lcand_valid = base->is_point_on_right(lcand->destination()); // valid(e) = RightOf(e.dest, basel)
+            QuadEdge *lcand = base->sym()->orbit_next();
+            bool const lcand_valid = base->is_point_on_right(lcand->destination());// valid(e) = RightOf(e.dest, basel)
 
-            if(lcand_valid) {
-                while(Point::in_circle(base->destination(), base->origin(), lcand->destination(), lcand->orbit_next()->destination())) {
-                    HalfEdge* temp = lcand->orbit_next();
-                    HalfEdge::delete_edge(lcand);
+            if (lcand_valid) {
+                while (point_t::in_circle(
+                    base->destination(),
+                    base->origin(),
+                    lcand->destination(),
+                    lcand->orbit_next()->destination()
+                )) {
+                    QuadEdge *temp = lcand->orbit_next();
+                    delete_edge(lcand);
                     lcand = temp;
                 }
             }
 
-            HalfEdge* rcand = base->orbit_prev();
-            bool rcand_valid = base->is_point_on_right(rcand->destination()); // valid(e) = RightOf(e.dest, basel)
+            QuadEdge *rcand = base->orbit_prev();
+            bool const rcand_valid = base->is_point_on_right(rcand->destination());// valid(e) = RightOf(e.dest, basel)
 
-            if(rcand_valid) {
-                while (Point::in_circle(base->destination(), base->origin(), rcand->destination(), rcand->orbit_prev()->destination())) {
-                    HalfEdge* tmp = rcand->orbit_prev();
-                    HalfEdge::delete_edge(rcand);
+            if (rcand_valid) {
+                while (point_t::in_circle(
+                    base->destination(),
+                    base->origin(),
+                    rcand->destination(),
+                    rcand->orbit_prev()->destination()
+                )) {
+                    QuadEdge *tmp = rcand->orbit_prev();
+                    delete_edge(rcand);
                     rcand = tmp;
                 }
             }
 
             // Base must be the upper common tangent
-            if(!lcand_valid && !rcand_valid) {
+            if (!lcand_valid && !rcand_valid) {
                 break;
             }
 
-            if(!lcand_valid || (rcand_valid && Point::in_circle(lcand->destination(), lcand->origin(), rcand->origin(), rcand->destination()))) {
-                base = HalfEdge::connect(rcand, base->sym());
+            if (!lcand_valid ||
+                (rcand_valid &&
+                 point_t::in_circle(lcand->destination(), lcand->origin(), rcand->origin(), rcand->destination()))) {
+                base = connect_edges(rcand, base->sym());
             } else {
-                base = HalfEdge::connect(base->sym(), lcand->sym());
+                base = connect_edges(base->sym(), lcand->sym());
             }
-
         }
 
         return {ldo, rdo};
     }
 
-    std::vector<Edge> triangulate(points_t points) {
-        if(points.size() < 3) {
-            return {};
-        }
-
-        triangulate_points(points);
-
-        std::vector<Edge> edges;
-
-        for(const auto& edge : HalfEdge::s_edges) {
-            if(edge->data == 1 || edge->data == 2 || edge->data == 3 || edge->data == 4) {
-                edges.emplace_back(edge->origin(), edge->destination(), edge->data);
-                edge->sym()->data = 0;
+    auto Delaunay::compute_lowest_common_tangent(QuadEdge *ldi, QuadEdge *rdi) -> std::pair<QuadEdge *, QuadEdge *> {
+        // Compute the lower common tangent of left and right
+        while (true) {
+            if (ldi->is_point_on_left(rdi->origin())) {
+                ldi = ldi->left_face_next();
+            } else if (rdi->is_point_on_right(ldi->origin())) {
+                rdi = rdi->right_face_prev();
+            } else {
+                break;
             }
         }
 
-        return edges;
+        return {ldi, rdi};
     }
 
-    HalfEdge* triangulate_points(points_t points) {
-        if(points.size() < 3) {
-            return {};
+    auto
+    Delaunay::delaunay_divide_and_conquer(std::vector<point_t> const &points, std::size_t start, std::size_t length)
+        -> std::pair<QuadEdge *, QuadEdge *> {
+        // Build a single edge out of 2 points
+        if (length == 2) {
+            auto *a = make_edge(points[start], points[start + 1]);
+            return {a, a->sym()};
         }
 
-        for(HalfEdge* e : HalfEdge::s_edges)  {
-            delete e;
+        // Build a triangle out of the three given points
+        if (length == 3) {
+            return build_triangle(start, points);
         }
 
-        HalfEdge::s_edges.clear();
+        // Divide and CONQUER
+        std::uint8_t const off = length % 2 == 0 ? 0 : 1;// Adjust for uneven lengths of array
+        auto left = delaunay_divide_and_conquer(points, start, length / 2);
+        auto right = delaunay_divide_and_conquer(points, start + length / 2, length / 2 + off);
 
-        std::stable_sort(points.begin(), points.end(), [](point_ref_t a, point_ref_t b) {
-            return a == b ? a.y > b.y : a.x > b.x;
-        });
+        // Find lowest common tangent (lowest point) of both halves
+        auto lowest = compute_lowest_common_tangent(left.second, right.first);
 
-        auto delaunay = delaunay_divide_and_conquer(points, 0, points.size());
-        return delaunay.first;
+        // Merge both halves
+        auto merge_result = merge(left.first, lowest.first, lowest.second, right.second);
+
+        // Return result
+        return merge_result;
     }
 
-    std::vector<Triangle> get_triangles(points_t points) {
-        if(points.size() < 3) {
-            return {};
+    auto Delaunay::get_primary_edges() -> std::vector<QuadEdge *> const & {
+        return this->primary_edges;
+    }
+
+    auto Delaunay::get_dual_edges() -> std::vector<QuadEdge *> const & {
+        return this->dual_edges;
+    }
+
+    void Delaunay::calculate_vornoi_graph(QuadEdge *start) {
+        if (start == nullptr) {
+            return;
         }
 
-        HalfEdge* starting_edge = triangulate_points(points);
+        std::stack<QuadEdge *> edges_to_visit;
+        edges_to_visit.push(start);
 
-        //visited = set()
-        //stack = [startEdge]
-        //
-        //while stack is not empty:
-        //  edge = stack.pop()
-        //  triangle = [edge, edge.Lnext(), edge.Lnext().Lnext()]
-        //
-        //  if triangle not in visited:
-        //      visited.add(triangle)
-        //      processTriangle(triangle)
-        //
-        //  for e in triangle:
-        //      oppositeEdge = e.Sym()
-        //      if oppositeEdge not in stack:
-        //          stack.push(oppositeEdge)
+        while (!edges_to_visit.empty()) {
+            QuadEdge *current = edges_to_visit.top();
+            edges_to_visit.pop();
 
-        std::vector<Triangle> triangles;
+            QuadEdge *a = current;
+            QuadEdge *b = current->left_face_next();
+            QuadEdge *c = current->left_face_next()->left_face_next();
 
-        while(starting_edge->is_point_on_left(starting_edge->orbit_next()->destination())) {
-            starting_edge = starting_edge->orbit_next();
-        }
+            // If one of the edges was already visited, we don't want to create a triangle here as there already is one
+            if (a->state == EdgeState::INITIALIZED && b->state == EdgeState::INITIALIZED &&
+                c->state == EdgeState::INITIALIZED) {
+                if (point_t::counter_clock_wise(a->origin(), b->origin(), c->origin())) {
+                    point_t const circumcenter = point_t::circumcenter(a->origin(), b->origin(), c->origin());
 
-        std::stack<HalfEdge*> to_visit;
-        auto current = starting_edge;
-        do {
-            to_visit.push(current->sym());
-            current = current->left_face_next();
-        } while(current != starting_edge);
+                    a->inv_rot()->m_origin = circumcenter;
+                    b->inv_rot()->m_origin = circumcenter;
+                    c->inv_rot()->m_origin = circumcenter;
 
-
-        while(!to_visit.empty()) {
-            HalfEdge* e = to_visit.top();
-            to_visit.pop();
-
-            if(e->data == -1 || e->data == 0) {
-                continue;
+                    a->inv_rot()->state = EdgeState::INITIALIZED;
+                    b->inv_rot()->state = EdgeState::INITIALIZED;
+                    c->inv_rot()->state = EdgeState::INITIALIZED;
+                }
             }
 
-            auto current = e;
-            std::vector<HalfEdge*> tris_points;
+            // Mark current Edge as already visited
+            current->state = EdgeState::PROCESSED;
+            current->sym()->state = EdgeState::PROCESSED;
 
-            do {
-                tris_points.push_back(current);
-                if(tris_points.size() == 3) {
-                    triangles.push_back({
-                    tris_points[0], tris_points[1], tris_points[2]
-                    });
-                    tris_points.clear();
-                }
+            // The edges a and b are chosen is such a way, that their left face is
+            // not the same face as the triangle we just generated.
 
-                if(current->sym()->data > 0) {
-                    to_visit.push(current->sym());
-                }
+            // Edge of upper adjacent triangle pointing in counterclockwise direction of the next triangle
+            QuadEdge *next_a = current->left_face_next()->sym();
+            if (next_a->state == EdgeState::INITIALIZED) {
+                edges_to_visit.push(next_a);
+            }
 
-                current->data = 0;
-                current = current->left_face_next();
-            } while(current != e);
+            // Edge of lower adjacent triangle pointing in counterclockwise direction of the next triangle
+            QuadEdge *next_b = current->orbit_next();
+            if (next_b->state == EdgeState::INITIALIZED) {
+                edges_to_visit.push(next_b);
+            }
+        }
+    }
 
+
+    auto Delaunay::make_edge(point_t const &origin, point_t const &destination) -> QuadEdge * {
+        auto *primary = new QuadEdge(origin);
+        auto *dual =
+            new QuadEdge(point_t(std::numeric_limits<scalar_t>::infinity(), std::numeric_limits<scalar_t>::infinity()));
+        auto *primary_sym = new QuadEdge(destination);
+        auto *dual_sym =
+            new QuadEdge(point_t(std::numeric_limits<scalar_t>::infinity(), std::numeric_limits<scalar_t>::infinity()));
+
+        // The primary edges have a set origin and destination
+        primary->state = EdgeState::INITIALIZED;
+        primary_sym->state = EdgeState::INITIALIZED;
+
+        primary->p_onext = primary;
+        primary_sym->p_onext = primary_sym;
+        dual->p_onext = dual_sym;
+        dual_sym->p_onext = dual;
+
+        primary->p_rot = dual;
+        dual->p_rot = primary_sym;
+        primary_sym->p_rot = dual_sym;
+        dual_sym->p_rot = primary;
+
+        primary_edges.emplace_back(primary);
+        dual_edges.emplace_back(dual);
+        primary_sym_edges.emplace_back(primary_sym);
+        dual_sym_edges.emplace_back(dual_sym);
+
+        return primary;
+    }
+
+    void Delaunay::delete_edge(QuadEdge *e) {
+        splice_edges(e, e->orbit_prev());
+        splice_edges(e->sym(), e->sym()->orbit_prev());
+        e->state = EdgeState::DELETED;
+        e->sym()->state = EdgeState::DELETED;
+    }
+
+    void Delaunay::splice_edges(QuadEdge *a, QuadEdge *b) {
+        auto *alpha = a->p_onext->p_rot;
+        auto *beta = b->p_onext->p_rot;
+
+        auto *a_onext = a->p_onext;
+        auto *b_onext = b->p_onext;
+        auto *alpha_onext = alpha->p_onext;
+        auto *beta_onext = beta->p_onext;
+
+        a->p_onext = b_onext;
+        b->p_onext = a_onext;
+        alpha->p_onext = beta_onext;
+        beta->p_onext = alpha_onext;
+    }
+
+    auto Delaunay::connect_edges(QuadEdge *a, QuadEdge *b) -> QuadEdge * {
+        auto *new_edge = make_edge(a->destination(), b->origin());
+        splice_edges(new_edge, a->left_face_next());
+        splice_edges(new_edge->sym(), b);
+        return new_edge;
+    }
+
+    Delaunay::~Delaunay() {
+        for (gsl::owner<QuadEdge *> edge : primary_edges) {
+            delete edge;
+        }
+        for (gsl::owner<QuadEdge *> edge : dual_edges) {
+            delete edge;
+        }
+        for (gsl::owner<QuadEdge *> edge : primary_sym_edges) {
+            delete edge;
+        }
+        for (gsl::owner<QuadEdge *> edge : dual_sym_edges) {
+            delete edge;
         }
 
-        return triangles;
+        primary_edges.clear();
+        dual_edges.clear();
+        primary_sym_edges.clear();
+        dual_sym_edges.clear();
     }
-}
+}// namespace analyser

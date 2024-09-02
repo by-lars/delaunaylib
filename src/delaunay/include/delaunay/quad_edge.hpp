@@ -1,10 +1,15 @@
-#ifndef DELAUNAY_QUAD_EDGE_H
-#define DELAUNAY_QUAD_EDGE_H
+#ifndef AS_DATA_RECORDER_QUAD_EDGE_HPP
+#define AS_DATA_RECORDER_QUAD_EDGE_HPP
+
+#include "delaunay/edge_state.hpp"
+#include "delaunay/point.hpp"
+#include "delaunay/types.hpp"
 
 #include <vector>
-#include "point.hpp"
 
 namespace delaunay {
+    class Delaunay;
+
     /**
      * This class implements the QuadEdge Data structure as described in
      * "Primitives for the Manipulation of General Subdivisions
@@ -21,57 +26,66 @@ namespace delaunay {
      *
      * A movement in the next direction is always in the counter clockwise direction
      * A movement in the prev direction is always in the clockwise direction.
+     *
+     * Read more here: https://www.cs.cmu.edu/afs/andrew/scs/cs/15-463/2001/pub/src/a2/quadedge.html
      */
-    class HalfEdge {
-    public:
+    struct QuadEdge {
         /**
          * Constructor setting up the default links
          * @param origin origin point of this half edge
          */
-        explicit HalfEdge(point_ref_t origin);
+        explicit QuadEdge(const point_t& origin);
 
         /**
          * The origin or start point of this edge
          * @return origin point
          */
-        point_t origin();
+        auto origin() -> point_t const &;
 
         /**
          * The destination or end point of this edge
          * Equivalent to this->sym()->origin()
          * @return destination point
          */
-        point_t destination();
+        auto destination() -> point_t const &;
 
         /**
-         * Gets the HalfEdge with the same orientation but opposite direction
-         * @return The symmetrical halfedge to this one
+         * Gets the QuadEdge with the same orientation but opposite direction
+         * @return The symmetrical QuadEdge to this one
          */
-        HalfEdge* sym();
+        auto sym() -> QuadEdge *;
 
         /**
          * Rotates around the Edges of the QuadEdge data structure, switching between
-         * the dual and the primal edge
+         * the dual and the primal edge. Rotating the Edge by 90° counterclockwise.
          *
-         * The edge eRot is the dual of the edge e, direct from eRight to eLeft.
+         * The edge eRot is the dual of the edge e, direct from eRight to eLeft (Pointing to the left Face of e).
          * eRot = eFlipDual = eDualFlipSym
          * eSym = eRot²
          *
-         * @return the next counter clockwise edge in the QuadEdge data structure
+         * @return the next counter clockwise edge in the QuadEdge data structure (dual edge if applied to primal edge,
+         * primal edge if applied to dual edge)
          */
-        HalfEdge* rot();
+        auto rot() -> QuadEdge *;
+
+        /**
+         * eRot⁻¹ = eRot³, same as rot but rotating clockwise.
+         * The Edge eRot⁻¹ is the dual Edge of e, pointing to the right Face of e
+         * @return the next clockwise edge in the QuadEdge data structure
+         */
+        auto inv_rot() -> QuadEdge *;
 
         /**
          * Counter clockwise rotation around the origin vertex of this edge
          * @return the next edge in counter clockwise direction of this edges origin vertex
          */
-        HalfEdge* orbit_next();
+        auto orbit_next() -> QuadEdge *;
 
         /**
          * Clockwise rotation around the origin vertex of this edge
          * @return the next edge in clockwise direction of this edges origin vertex
          */
-        HalfEdge* orbit_prev();
+        auto orbit_prev() -> QuadEdge *;
 
         /**
          * The next (moving counter clockwise) edge in the face that is on the left to this one.
@@ -79,7 +93,7 @@ namespace delaunay {
          * when moving along the boundary of the face F = eLeft in the counter clockwise direction.
          * @return next edge in the left face
          */
-        HalfEdge* left_face_next();
+        auto left_face_next() -> QuadEdge *;
 
         /**
          * The prev (moving clockwise) edge in the face that is on the left to this one
@@ -87,7 +101,7 @@ namespace delaunay {
          * when moving along the boundary of the face F = eLeft in the clockwise direction.
          * @return prev edge in the left face
          */
-        HalfEdge* left_face_prev();
+        auto left_face_prev() -> QuadEdge *;
 
         /**
          * The next (moving counter clockwise) edge in the face that is on the right to this one.
@@ -95,7 +109,7 @@ namespace delaunay {
          * when moving along the boundary of the face F = eRight in the counter clockwise direction.
          * @return next edge in the right face
          */
-        HalfEdge* right_face_next();
+        auto right_face_next() -> QuadEdge *;
 
         /**
          * The prev (moving clockwise) edge in the face that is on the right to this one
@@ -103,93 +117,53 @@ namespace delaunay {
          * when moving along the boundary of the face F = eRight in the clockwise direction.
          * @return prev edge in the right face
          */
-        HalfEdge* right_face_prev();
+        auto right_face_prev() -> QuadEdge *;
 
-    public:
         /**
          * Returns true if the specified point is to the right of this edge
          * @param point point to check
          * @return whether or not the point is to the right of this edge
          */
-        bool is_point_on_right(point_ref_t point);
+        auto is_point_on_right(point_t const &point) -> bool;
 
         /**
          * Returns true if the specified point is to the left of this edge
          * @param point point to check
          * @return whether or not the point is to the left of this edge
          */
-        bool is_point_on_left(point_ref_t point);
+        auto is_point_on_left(point_t const &point) -> bool;
+
 
         /**
-         * Create a new edge, and its QuadEdge entries
-         * @param origin the start point of the edge
-         * @param destination the end point of the edge
-         * @return HalfEdge* to the new edge
+         * If this edge is deleted / usable
+         * @return true if this edge is usable (has origin and destination)
          */
-        static HalfEdge* make(point_ref_t origin, point_ref_t destination);
+        auto is_deleted() -> bool;
 
         /**
-         * Splice is a fundamental operator on the QuadEdge data
-         * structure used to alter the connections of the rings
-         *
-         * It performs the following operations depending on
-         * 1. if the two rings are distinct, Splice will combine them into one
-         * 2. if the two are exactly the same ring, Splice will break it in two separate pieces
-         * 3. f the two are the same ring taken with opposite orientations, Splice will Flip (and reverse the order) of a segment of that ring.
-         * @param a first edge
-         * @param b second edge
+         * State of the Edge, e.g. in which stage of calculation (delaunay / vornoi) it is.
          */
-        static void splice(HalfEdge* a, HalfEdge* b);
+        EdgeState state;
 
-        /**
-         * Creates a new edge r, connecting the destination
-         * of a to the origin of b, in such a way that aLeft = eLeft = bLeft
-         *
-         * eLeft being the Left face of an Edge e
-         *
-         * @param a first edge
-         * @param b second edge
-         * @return New edge e
-         */
-        static HalfEdge* connect(HalfEdge* a, HalfEdge* b);
-
-        /**
-         * Deletes an edge out a ring
-         * This can cause the ring to fall
-         * apart into two separate pieces
-         * @param e Edge to delete
-         */
-        static void delete_edge(HalfEdge* e);
-
-    public:
-        static std::vector<HalfEdge*> s_edges;
-
-
-        int data;
-
-    private:
-        /**
-         * Onext pointer
-         * Points to the next edge in the edge ring / face this edge belongs to
-         */
-        HalfEdge* p_onext;
-
-        /**
-         * rot pointer
-         * Points to the next edge with the same origin as this one
-         */
-        HalfEdge* p_rot;
-
+      private:
         /**
          * Origin point of this half edge
          */
         point_t m_origin;
+
+        /**
+         * Onext pointer
+         * Points to the next edge in the edge ring / face this edge belongs to
+         */
+        QuadEdge *p_onext;
+
+        /**
+         * rot pointer
+         * Points to the next edge in the QuadEdge data structure
+         */
+        QuadEdge *p_rot;
+
+        friend class delaunay::Delaunay;
     };
-
-    using edge_t = HalfEdge;
-    using edge_ref_r = const edge_t&;
-}
-
-
-
-#endif //DELAUNAY_QUAD_EDGE_H
+}// namespace analyser
+#endif// AS_DATA_RECORDER_QUAD_EDGE_HPP

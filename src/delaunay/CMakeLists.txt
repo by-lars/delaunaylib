@@ -5,8 +5,9 @@ set(SOURCES
         src/delaunay.cpp
         src/quad_edge.cpp
         src/point.cpp
-        src/edge.cpp
-    )
+        include/delaunay/types.hpp
+        include/delaunay/types.hpp
+)
 
 add_library(${PROJECT_NAME} STATIC ${SOURCES})
 target_include_directories(${PROJECT_NAME} PUBLIC include)

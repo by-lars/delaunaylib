@@ -1,8 +1,8 @@
-#include "point.hpp"
-#include <iostream>
+#include "delaunay/point.hpp"
+#include <limits>
 
 namespace delaunay {
-    Point::Point(float x, float y) : x(x), y(y) {}
+    Point::Point(scalar_t x, scalar_t y) : x(x), y(y) {}
 
     bool Point::operator==(const Point &other) const {
         return  this->x == other.x && this->y == other.y;
@@ -49,5 +49,37 @@ namespace delaunay {
 
         return det > 0;
     }
+
+    auto Point::circumcenter(Point const &point_a, Point const &point_b, Point const &point_c) -> Point {
+        // https://en.wikipedia.org/wiki/Circumcircle
+        // See Cartesian Coordiantes section
+
+        double const length_squared_a{point_a.x * point_a.x + point_a.y * point_a.y};
+        double const length_squared_b{point_b.x * point_b.x + point_b.y * point_b.y};
+        double const length_squared_c{point_c.x * point_c.x + point_c.y * point_c.y};
+
+        double const distance{
+                2.0 * (point_a.x * (point_b.y - point_c.y) + point_b.x * (point_c.y - point_a.y) +
+                       point_c.x * (point_a.y - point_b.y))
+        };
+
+        if (distance == 0) {
+            return Point{std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity()};
+        }
+
+        double const circumcenter_x{
+                (length_squared_a * (point_b.y - point_c.y) + length_squared_b * (point_c.y - point_a.y) +
+                 length_squared_c * (point_a.y - point_b.y)) /
+                distance
+        };
+        double const circumcenter_y{
+                (length_squared_a * (point_c.x - point_b.x) + length_squared_b * (point_a.x - point_c.x) +
+                 length_squared_c * (point_b.x - point_a.x)) /
+                distance
+        };
+
+        return Point{circumcenter_x, circumcenter_y};
+    }
+
 }
 

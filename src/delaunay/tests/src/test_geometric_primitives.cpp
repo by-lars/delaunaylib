@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
-#include "delaunay.hpp"
-#include "point.hpp"
-#include "quad_edge.hpp"
+#include "delaunay/delaunay.hpp"
+#include "delaunay/point.hpp"
+#include "delaunay/quad_edge.hpp"
 
 /****************************
  * CCW / Counter Clock Wise *
@@ -55,7 +55,7 @@ TEST(GeometricPrimitives, LeftOf) {
     delaunay::Point b(0, 1);
     delaunay::Point c(-1, 0.5f);
 
-    delaunay::HalfEdge* edge = delaunay::HalfEdge::make(a, b);
+    delaunay::QuadEdge* edge = delaunay::QuadEdge::make(a, b);
     ASSERT_TRUE(edge->is_point_on_left(c));
     ASSERT_FALSE(edge->is_point_on_right(c));
 }

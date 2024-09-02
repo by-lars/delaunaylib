@@ -2,24 +2,23 @@
 #define DELAUNAY_POINT_H
 
 #include <vector>
+#include "delaunay/types.hpp"
 
 namespace delaunay {
     struct Point {
-        Point(float x, float y);
+        Point(scalar_t x, scalar_t y);
 
         bool operator==(const Point& other) const;
 
-        float x;
-        float y;
+        scalar_t x;
+        scalar_t y;
 
         [[nodiscard]] static bool counter_clock_wise(const Point& a, const Point& b, const Point& c);
         [[nodiscard]] static bool in_circle(const Point& a, const Point& b, const Point& c, const Point& d);
+        [[nodiscard]] static auto circumcenter(Point const &point_a, Point const &point_b, Point const &point_c) -> Point;
     };
 
     using point_t = Point;
-    using point_ref_t = const Point&;
-    using points_t = std::vector<point_t>;
-    using points_ref_t = const points_t&;
 }
 
 
