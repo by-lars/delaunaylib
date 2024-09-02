@@ -1,5 +1,5 @@
-# Delaunay Triangulation 
-+ Vornoi Graph
+# Delaunay Triangulation
+_with Vornoi Graph_
 
 This C++ library implements the Delaunay Triangulation algorithm described in the paper "Primitives for the Manipulation of General Subdivisions and the Computation of Voronoi Diagrams" by LEONIDA GUIBAS and JORGE STOLFI.
 It utilizes the Quad Edge data structure to represent two graphs (the primary delaunay graph and its dual, the vornoi grpah) with one data structure. 
